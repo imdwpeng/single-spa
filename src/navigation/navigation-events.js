@@ -9,6 +9,10 @@ import { isStarted } from "../start.js";
  * single-spa has ensured that the correct applications are
  * unmounted and mounted.
  */
+/**
+ * 收集应用自身注册的hashchange、popstate事件
+ * 实现方法：通过重写 window.addEventListener 和 window.removeEventListener 实现
+ */
 const capturedEventListeners = {
   hashchange: [],
   popstate: [],
@@ -139,14 +143,19 @@ function createPopStateEvent(state, originalMethodName) {
 
 if (isInBrowser) {
   // We will trigger an app change for any routing events.
+  // 注册路由监听事件
   window.addEventListener("hashchange", urlReroute);
   window.addEventListener("popstate", urlReroute);
 
   // Monkeypatch addEventListener so that we can ensure correct timing
+  // 暂存window的addEventListener和removeEventListener方法
   const originalAddEventListener = window.addEventListener;
   const originalRemoveEventListener = window.removeEventListener;
+
+  // 重写addEventListener方法
   window.addEventListener = function (eventName, fn) {
     if (typeof fn === "function") {
+      // 收集子应用自身注册的hashchange、popstate事件
       if (
         routingEventsListeningTo.indexOf(eventName) >= 0 &&
         !find(capturedEventListeners[eventName], (listener) => listener === fn)
@@ -156,11 +165,14 @@ if (isInBrowser) {
       }
     }
 
+    // 执行除hashchange、popstate之外的事件，且保证this不被劫持，接受的参数也会被原封不动的传入
     return originalAddEventListener.apply(this, arguments);
   };
 
+  // 重写removeEventListener方法
   window.removeEventListener = function (eventName, listenerFn) {
     if (typeof listenerFn === "function") {
+      // 过滤掉之前保存的事件
       if (routingEventsListeningTo.indexOf(eventName) >= 0) {
         capturedEventListeners[eventName] = capturedEventListeners[
           eventName
@@ -168,7 +180,8 @@ if (isInBrowser) {
         return;
       }
     }
-
+    
+    // 执行除hashchange、popstate之外的事件，且保证this不被劫持，接受的参数也会被原封不动的传入
     return originalRemoveEventListener.apply(this, arguments);
   };
 

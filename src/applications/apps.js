@@ -26,7 +26,7 @@ import { assign } from "../utils/assign";
 const apps = [];
 
 export function getAppChanges() {
-  const appsToUnload = [],
+  const appsToUnload = [], 
     appsToUnmount = [], // 待卸载的子应用
     appsToLoad = [], // 待加载的子应用
     appsToMount = []; // 待挂载的子应用

@@ -58,7 +58,7 @@ export function reroute(pendingPromises = [], eventArguments) {
     oldUrl = currentUrl,
     newUrl = (currentUrl = window.location.href);
 
-  // 执行start启动后，返回true
+  // 执行start启动时，走这里
   if (isStarted()) {
     appChangeUnderway = true;
     appsThatChanged = appsToUnload.concat(
@@ -68,6 +68,7 @@ export function reroute(pendingPromises = [], eventArguments) {
     );
     return performAppChanges();
   } else {
+    // registerApplication走这里
     appsThatChanged = appsToLoad;
     return loadApps();
   }
@@ -233,6 +234,11 @@ export function reroute(pendingPromises = [], eventArguments) {
    * the current run of performAppChanges(), but also all of the queued event listeners.
    * We want to call the listeners in the same order as if they had not been delayed by
    * single-spa, which means queued ones first and then the most recent one.
+   */
+  /**
+   * 执行应用中原本注册的hashchange、popstate事件
+   * 因为single-spa会监听hashchange、popstate事件，在应用切换的时候，重新调用reroute，进行应用的卸载加载
+   * 应用原本的hashchange、popstate事件需要在应用加载后执行
    */
   function callAllEventListeners() {
     pendingPromises.forEach((pendingPromise) => {
