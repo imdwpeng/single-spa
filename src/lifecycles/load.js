@@ -22,6 +22,7 @@ import { assign } from "../utils/assign.js";
 
 export function toLoadPromise(app) {
   return Promise.resolve().then(() => {
+    // 在执行中了，则直接return
     if (app.loadPromise) {
       return app.loadPromise;
     }
@@ -30,12 +31,14 @@ export function toLoadPromise(app) {
       return app;
     }
 
+    // 修改子应用状态为加载资源中
     app.status = LOADING_SOURCE_CODE;
 
     let appOpts, isUserErr;
 
     return (app.loadPromise = Promise.resolve()
       .then(() => {
+        // 执行子应用静态资源加载
         const loadPromise = app.loadApp(getProps(app));
         if (!smellsLikeAPromise(loadPromise)) {
           // The name of the app will be prepended to this error message inside of the handleAppError function
@@ -51,6 +54,7 @@ export function toLoadPromise(app) {
             )
           );
         }
+
         return loadPromise.then((val) => {
           app.loadErrorTime = null;
 
@@ -65,6 +69,7 @@ export function toLoadPromise(app) {
             }
           }
 
+          // 校验子应用是否存在bootstrap、mount、unmount钩子
           if (
             // ES Modules don't have the Object prototype
             Object.prototype.hasOwnProperty.call(appOpts, "bootstrap") &&
@@ -75,14 +80,12 @@ export function toLoadPromise(app) {
               validationErrMessage = `does not export a valid bootstrap function or array of functions`;
             }
           }
-
           if (!validLifecycleFn(appOpts.mount)) {
             validationErrCode = 36;
             if (__DEV__) {
               validationErrMessage = `does not export a mount function or array of functions`;
             }
           }
-
           if (!validLifecycleFn(appOpts.unmount)) {
             validationErrCode = 37;
             if (__DEV__) {
@@ -123,6 +126,7 @@ export function toLoadPromise(app) {
           }
 
           app.status = NOT_BOOTSTRAPPED;
+          // 数组拍平，bootstrap钩子接受function/array
           app.bootstrap = flattenFnArray(appOpts, "bootstrap");
           app.mount = flattenFnArray(appOpts, "mount");
           app.unmount = flattenFnArray(appOpts, "unmount");

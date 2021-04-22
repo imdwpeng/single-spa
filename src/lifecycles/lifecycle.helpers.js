@@ -1,3 +1,9 @@
+/*
+ * @Author: DWP
+ * @Date: 2021-04-21 23:19:51
+ * @LastEditors: DWP
+ * @LastEditTime: 2021-04-22 09:33:36
+ */
 import { find } from "../utils/find.js";
 import { objectType, toName } from "../applications/app.helpers.js";
 import { formatErrorMessage } from "../applications/app-errors.js";
@@ -12,6 +18,7 @@ export function validLifecycleFn(fn) {
   }
 }
 
+// 数组拍平 输出Promise
 export function flattenFnArray(appOrParcel, lifecycle) {
   let fns = appOrParcel[lifecycle] || [];
   fns = Array.isArray(fns) ? fns : [fns];

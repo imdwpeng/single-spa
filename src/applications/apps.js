@@ -27,29 +27,35 @@ const apps = [];
 
 export function getAppChanges() {
   const appsToUnload = [],
-    appsToUnmount = [],
-    appsToLoad = [],
-    appsToMount = [];
+    appsToUnmount = [], // 待卸载的子应用
+    appsToLoad = [], // 待加载的子应用
+    appsToMount = []; // 待挂载的子应用
 
   // We re-attempt to download applications in LOAD_ERROR after a timeout of 200 milliseconds
   const currentTime = new Date().getTime();
 
   apps.forEach((app) => {
+    // shouldBeActive: 根据 app.activeWhen 判断是否需要激活当前子应用
     const appShouldBeActive =
       app.status !== SKIP_BECAUSE_BROKEN && shouldBeActive(app);
 
     switch (app.status) {
+      // 资源加载失败
       case LOAD_ERROR:
         if (appShouldBeActive && currentTime - app.loadErrorTime >= 200) {
           appsToLoad.push(app);
         }
         break;
+      // 未加载
+      // 加载资源
       case NOT_LOADED:
       case LOADING_SOURCE_CODE:
         if (appShouldBeActive) {
           appsToLoad.push(app);
         }
         break;
+      // 未启动
+      // 未挂载
       case NOT_BOOTSTRAPPED:
       case NOT_MOUNTED:
         if (!appShouldBeActive && getAppUnloadInfo(toName(app))) {
@@ -58,6 +64,7 @@ export function getAppChanges() {
           appsToMount.push(app);
         }
         break;
+      // 挂载完成
       case MOUNTED:
         if (!appShouldBeActive) {
           appsToUnmount.push(app);
@@ -75,6 +82,7 @@ export function getMountedApps() {
 }
 
 export function getAppNames() {
+  // apps.map(app=>app.name)
   return apps.map(toName);
 }
 
@@ -88,12 +96,20 @@ export function getAppStatus(appName) {
   return app ? app.status : null;
 }
 
+/**
+ * 注册子应用
+ * @param {string/{name, app, activeWhen, customProps}} appNameOrConfig 子应用名称，接受string和object（object同时包括下面三个参数）
+ * @param {function} appOrLoadApp 加载静态资源
+ * @param {string/function} activeWhen 路由判断，是否需要激活当前子应用
+ * @param {object} customProps 自定义数据
+ */
 export function registerApplication(
   appNameOrConfig,
   appOrLoadApp,
   activeWhen,
   customProps
 ) {
+  // 参数校验
   const registration = sanitizeArguments(
     appNameOrConfig,
     appOrLoadApp,
@@ -101,6 +117,7 @@ export function registerApplication(
     customProps
   );
 
+  // 校验子应用名称是否已被使用
   if (getAppNames().indexOf(registration.name) !== -1)
     throw Error(
       formatErrorMessage(
@@ -112,10 +129,11 @@ export function registerApplication(
     );
 
   apps.push(
+    // Object.assign()
     assign(
       {
         loadErrorTime: null,
-        status: NOT_LOADED,
+        status: NOT_LOADED, // 状态
         parcels: {},
         devtools: {
           overlays: {
@@ -270,6 +288,7 @@ function validateRegisterWithArguments(
 }
 
 export function validateRegisterWithConfig(config) {
+  // 子应用名称必传，且不能为数组
   if (Array.isArray(config) || config === null)
     throw Error(
       formatErrorMessage(
@@ -277,12 +296,16 @@ export function validateRegisterWithConfig(config) {
         __DEV__ && "Configuration object can't be an Array or null!"
       )
     );
+
   const validKeys = ["name", "app", "activeWhen", "customProps"];
+  // 筛选validKeys之外的参数
   const invalidKeys = Object.keys(config).reduce(
     (invalidKeys, prop) =>
       validKeys.indexOf(prop) >= 0 ? invalidKeys : invalidKeys.concat(prop),
     []
   );
+
+  // 只允许传validKeys中的参数
   if (invalidKeys.length !== 0)
     throw Error(
       formatErrorMessage(
@@ -295,6 +318,8 @@ export function validateRegisterWithConfig(config) {
         invalidKeys.join(", ")
       )
     );
+  
+  // name必须传，且为string类型
   if (typeof config.name !== "string" || config.name.length === 0)
     throw Error(
       formatErrorMessage(
@@ -303,6 +328,8 @@ export function validateRegisterWithConfig(config) {
           "The config.name on registerApplication must be a non-empty string"
       )
     );
+  
+  // app为对象或者函数
   if (typeof config.app !== "object" && typeof config.app !== "function")
     throw Error(
       formatErrorMessage(
@@ -311,8 +338,11 @@ export function validateRegisterWithConfig(config) {
           "The config.app on registerApplication must be an application or a loading function"
       )
     );
+
   const allowsStringAndFunction = (activeWhen) =>
     typeof activeWhen === "string" || typeof activeWhen === "function";
+  
+  // activeWhen允许传string、function，或array[string/function]
   if (
     !allowsStringAndFunction(config.activeWhen) &&
     !(
@@ -327,6 +357,8 @@ export function validateRegisterWithConfig(config) {
           "The config.activeWhen on registerApplication must be a string, function or an array with both"
       )
     );
+
+  // customProps非必填，传的格式为function或者{}对象
   if (!validCustomProps(config.customProps))
     throw Error(
       formatErrorMessage(
@@ -352,6 +384,7 @@ function sanitizeArguments(
   activeWhen,
   customProps
 ) {
+  // 判断子应用名称是否为对象
   const usingObjectAPI = typeof appNameOrConfig === "object";
 
   const registration = {
@@ -361,13 +394,16 @@ function sanitizeArguments(
     customProps: null,
   };
 
+  // 子应用名称为对象时
   if (usingObjectAPI) {
+    // 参数校验
     validateRegisterWithConfig(appNameOrConfig);
     registration.name = appNameOrConfig.name;
     registration.loadApp = appNameOrConfig.app;
     registration.activeWhen = appNameOrConfig.activeWhen;
     registration.customProps = appNameOrConfig.customProps;
   } else {
+    // 参数校验
     validateRegisterWithArguments(
       appNameOrConfig,
       appOrLoadApp,
@@ -380,8 +416,11 @@ function sanitizeArguments(
     registration.customProps = customProps;
   }
 
+  // return Promise
   registration.loadApp = sanitizeLoadApp(registration.loadApp);
+  // 默认值{}
   registration.customProps = sanitizeCustomProps(registration.customProps);
+  // 传入函数/url string， return true/false
   registration.activeWhen = sanitizeActiveWhen(registration.activeWhen);
 
   return registration;
@@ -404,7 +443,7 @@ function sanitizeActiveWhen(activeWhen) {
   activeWhenArray = activeWhenArray.map((activeWhenOrPath) =>
     typeof activeWhenOrPath === "function"
       ? activeWhenOrPath
-      : pathToActiveWhen(activeWhenOrPath)
+      : pathToActiveWhen(activeWhenOrPath) // 封装成function(location){return true/false}
   );
 
   return (location) =>
@@ -415,6 +454,7 @@ export function pathToActiveWhen(path, exactMatch) {
   const regex = toDynamicPathValidatorRegex(path, exactMatch);
 
   return (location) => {
+    // 去除search和origin，如http://www.baidu.com/abc?a=1&b=2 --> /abc
     const route = location.href
       .replace(location.origin, "")
       .replace(location.search, "")

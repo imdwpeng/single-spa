@@ -45,17 +45,20 @@ export function reroute(pendingPromises = [], eventArguments) {
     });
   }
 
+  // 获取状态区分的子应用数组
   const {
     appsToUnload,
     appsToUnmount,
     appsToLoad,
     appsToMount,
   } = getAppChanges();
+
   let appsThatChanged,
     navigationIsCanceled = false,
     oldUrl = currentUrl,
     newUrl = (currentUrl = window.location.href);
 
+  // 执行start启动后，返回true
   if (isStarted()) {
     appChangeUnderway = true;
     appsThatChanged = appsToUnload.concat(
@@ -75,6 +78,7 @@ export function reroute(pendingPromises = [], eventArguments) {
 
   function loadApps() {
     return Promise.resolve().then(() => {
+      // 封装成Promise
       const loadPromises = appsToLoad.map(toLoadPromise);
 
       return (
