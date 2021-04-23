@@ -21,6 +21,7 @@ export function toUnloadPromise(app) {
       return app;
     }
 
+    // 状态为未加载时，直接清除对应app数据
     if (app.status === NOT_LOADED) {
       /* This app is already unloaded. We just need to clean up
        * anything that still thinks we need to unload the app.
@@ -29,6 +30,7 @@ export function toUnloadPromise(app) {
       return app;
     }
 
+    // 状态为移除中，只需执行一次
     if (app.status === UNLOADING) {
       /* Both unloadApplication and reroute want to unload this app.
        * It only needs to be done once, though.
@@ -36,6 +38,7 @@ export function toUnloadPromise(app) {
       return unloadInfo.promise.then(() => app);
     }
 
+    // 卸载后才能移除
     if (app.status !== NOT_MOUNTED && app.status !== LOAD_ERROR) {
       /* The app cannot be unloaded until it is unmounted.
        */
@@ -61,6 +64,7 @@ export function toUnloadPromise(app) {
   });
 }
 
+// 重置子应用数据
 function finishUnloadingApp(app, unloadInfo) {
   delete appsToUnload[toName(app)];
 
@@ -91,6 +95,7 @@ function errorUnloadingApp(app, unloadInfo, err) {
   unloadInfo.reject(err);
 }
 
+// 将应用添加至appsToUnload中，执行reroute时会移除这些应用
 export function addAppToUnload(app, promiseGetter, resolve, reject) {
   appsToUnload[toName(app)] = { app, resolve, reject };
   Object.defineProperty(appsToUnload[toName(app)], "promise", {

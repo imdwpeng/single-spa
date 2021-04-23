@@ -26,7 +26,7 @@ import { assign } from "../utils/assign";
 const apps = [];
 
 export function getAppChanges() {
-  const appsToUnload = [], 
+  const appsToUnload = [], // 待移除的子应用
     appsToUnmount = [], // 待卸载的子应用
     appsToLoad = [], // 待加载的子应用
     appsToMount = []; // 待挂载的子应用
@@ -58,6 +58,7 @@ export function getAppChanges() {
       // 未挂载
       case NOT_BOOTSTRAPPED:
       case NOT_MOUNTED:
+        // 待移除的应用
         if (!appShouldBeActive && getAppUnloadInfo(toName(app))) {
           appsToUnload.push(app);
         } else if (appShouldBeActive) {
@@ -196,6 +197,7 @@ export function unloadApplication(appName, opts = { waitForUnmount: false }) {
   }
 
   const appUnloadInfo = getAppUnloadInfo(toName(app));
+  // 等到路由跳转，正常卸载后再移除该应用
   if (opts && opts.waitForUnmount) {
     // We need to wait for unmount before unloading the app
 
@@ -231,8 +233,11 @@ export function unloadApplication(appName, opts = { waitForUnmount: false }) {
   }
 }
 
+// 立即执行卸载、移除应用程序
 function immediatelyUnloadApp(app, resolve, reject) {
+  // 卸载应用
   toUnmountPromise(app)
+    // 移除应用
     .then(toUnloadPromise)
     .then(() => {
       resolve();

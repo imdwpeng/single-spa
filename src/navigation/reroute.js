@@ -35,6 +35,7 @@ export function triggerAppChange() {
 }
 
 export function reroute(pendingPromises = [], eventArguments) {
+  // 指明reroute在一次执行周期中，其他reroute将被挂起，直到本次reroute递归调用才予以执行
   if (appChangeUnderway) {
     return new Promise((resolve, reject) => {
       peopleWaitingOnAppChange.push({
@@ -79,7 +80,8 @@ export function reroute(pendingPromises = [], eventArguments) {
 
   function loadApps() {
     return Promise.resolve().then(() => {
-      // 封装成Promise
+      // 加载子应用
+      // status：NOT_LOADED => LOADING_SOURCE_CODE => NOT_BOOTSTRAPPED
       const loadPromises = appsToLoad.map(toLoadPromise);
 
       return (
@@ -98,6 +100,10 @@ export function reroute(pendingPromises = [], eventArguments) {
   function performAppChanges() {
     return Promise.resolve().then(() => {
       // https://github.com/single-spa/single-spa/issues/545
+      /**
+       * 创建并触发自定义事件，详情见官网 https://zh-hans.single-spa.js.org/docs/api/#custom-events
+       * 可通过window.addEventListener('single-spa:...',()=>{})监听该自定义事件
+       */
       window.dispatchEvent(
         new CustomEvent(
           appsThatChanged.length === 0
@@ -125,9 +131,20 @@ export function reroute(pendingPromises = [], eventArguments) {
         navigateToUrl(oldUrl);
         return;
       }
-
+      // 重点来了
+      /**
+       * 移除子应用，执行unload钩子函数
+       * 清除子应用的bootstrap、mount、unmount、unload，返回Promise
+       * 下次激活时需要重头走加载启动挂载逻辑
+       * status：NOT_MOUNTED => UNLOADING => NOT_LOADED
+       */
       const unloadPromises = appsToUnload.map(toUnloadPromise);
 
+      /**
+       * 卸载子应用，执行unmount钩子函数
+       * 下次激活时只需要重新挂载即可
+       * status：MOUNTED => UNMOUNTING => NOT_MOUNTED
+       */
       const unmountUnloadPromises = appsToUnmount
         .map(toUnmountPromise)
         .map((unmountPromise) => unmountPromise.then(toUnloadPromise));
@@ -148,7 +165,9 @@ export function reroute(pendingPromises = [], eventArguments) {
       /* We load and bootstrap apps while other apps are unmounting, but we
        * wait to mount the app until all apps are finishing unmounting
        */
+      // 待加载的子应用：加载 => 启动 => 挂载
       const loadThenMountPromises = appsToLoad.map((app) => {
+        // status：NOT_LOADED => LOADING_SOURCE_CODE => NOT_BOOTSTRAPPED
         return toLoadPromise(app).then((app) =>
           tryToBootstrapAndMount(app, unmountAllPromise)
         );
@@ -158,11 +177,14 @@ export function reroute(pendingPromises = [], eventArguments) {
        * to be mounted. They each wait for all unmounting apps to finish up
        * before they mount.
        */
+      // 待挂载的子应用：挂载
       const mountPromises = appsToMount
+        // 过滤掉待加载的应用
         .filter((appToMount) => appsToLoad.indexOf(appToMount) < 0)
         .map((appToMount) => {
           return tryToBootstrapAndMount(appToMount, unmountAllPromise);
         });
+
       return unmountAllPromise
         .catch((err) => {
           callAllEventListeners();
@@ -186,6 +208,7 @@ export function reroute(pendingPromises = [], eventArguments) {
   }
 
   function finishUpAndReturn() {
+    // 获取当前激活的应用
     const returnValue = getMountedApps();
     pendingPromises.forEach((promise) => promise.resolve(returnValue));
 
@@ -215,8 +238,10 @@ export function reroute(pendingPromises = [], eventArguments) {
      * We want to do this after the mounting/unmounting is done but before we
      * resolve the promise for the `reroute` function.
      */
+    // reroute单次执行结束，无挂起的reroute时，调用reroute将直接执行
     appChangeUnderway = false;
 
+    // 手动触发被挂起的reroute
     if (peopleWaitingOnAppChange.length > 0) {
       /* While we were rerouting, someone else triggered another reroute that got queued.
        * So we need reroute again.
@@ -248,6 +273,7 @@ export function reroute(pendingPromises = [], eventArguments) {
     callCapturedEventListeners(eventArguments);
   }
 
+  // 触发自定义事件时传出属性
   function getCustomEventDetail(isBeforeChanges = false, extraProperties) {
     const newAppStatuses = {};
     const appsByNewStatus = {
@@ -313,10 +339,21 @@ export function reroute(pendingPromises = [], eventArguments) {
  * twice if that application should be active before bootstrapping and mounting.
  * https://github.com/single-spa/single-spa/issues/524
  */
+/**
+ * 
+ * 如果用户在没有等待子应用加载的情况下切换到另一个路由
+ * 我们不应该加载和挂载该子应用，因此我们在加载和挂载之前检查两次该子应用是否出于激活状态
+ */
 function tryToBootstrapAndMount(app, unmountAllPromise) {
+  // 判断是否出于激活状态
   if (shouldBeActive(app)) {
+    // 启动
+    // status：NOT_BOOTSTRAPPED => BOOTSTRAPPING => NOT_MOUNTED
     return toBootstrapPromise(app).then((app) =>
+      // 先卸载再挂载
       unmountAllPromise.then(() =>
+        // 挂载
+        // status：NOT_MOUNTED => MOUNTED
         shouldBeActive(app) ? toMountPromise(app) : app
       )
     );

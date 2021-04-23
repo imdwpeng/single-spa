@@ -22,7 +22,7 @@ import { assign } from "../utils/assign.js";
 
 export function toLoadPromise(app) {
   return Promise.resolve().then(() => {
-    // 在执行中了，则直接return
+    // 在执行中了，则直接return，防止加载多次
     if (app.loadPromise) {
       return app.loadPromise;
     }

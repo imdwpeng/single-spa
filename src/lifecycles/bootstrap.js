@@ -1,3 +1,9 @@
+/*
+ * @Author: DWP
+ * @Date: 2021-04-21 23:19:51
+ * @LastEditors: DWP
+ * @LastEditTime: 2021-04-23 14:42:27
+ */
 import {
   NOT_BOOTSTRAPPED,
   BOOTSTRAPPING,
@@ -9,10 +15,12 @@ import { handleAppError, transformErr } from "../applications/app-errors.js";
 
 export function toBootstrapPromise(appOrParcel, hardFail) {
   return Promise.resolve().then(() => {
+    // status为NOT_BOOTSTRAPPED的才执行
     if (appOrParcel.status !== NOT_BOOTSTRAPPED) {
       return appOrParcel;
     }
 
+    // 修改状态
     appOrParcel.status = BOOTSTRAPPING;
 
     if (!appOrParcel.bootstrap) {
